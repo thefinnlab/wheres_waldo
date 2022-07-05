@@ -1,7 +1,9 @@
 import argparse
 import sys
 
+import nibabel as nib
 import pandas as pd
+from nilearn.datasets import fetch_atlas_schaefer_2018
 
 from wheres_waldo import __version__
 from wheres_waldo.utils import get_MNI_152, location_details
@@ -44,6 +46,14 @@ def _get_parser():
     )
     # Optional arguments
     optional.add_argument(
+        "-d",
+        "--dir",
+        help="Directory to save the output files.",
+        type=str,
+        dest="out_dir",
+        default=".",
+    )
+    optional.add_argument(
         "-n",
         "--networks",
         help="Number of networks to use.",
@@ -63,6 +73,15 @@ def _get_parser():
         dest="n_parcels",
         choices=[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000],
     )
+    optional.add_argument(
+        "--method",
+        help="Method to decode the ROI image.",
+        required=False,
+        type=str,
+        default="association",
+        dest="method",
+        choices=["association", "chi", "brainmap"],
+    )
     optional.add_argument("-v", "--version", action="version", version=("%(prog)s " + __version__))
 
     parser._action_groups.append(optional)
@@ -70,9 +89,7 @@ def _get_parser():
     return parser
 
 
-def wheres_waldo(rois, output, n_networks=7, n_parcels=100):
-    # TODO: write main function
-
+def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method="association"):
     # Download the Schaefer2018_100Parcels_7Networks_order_FSLMNI152_1mm.Centroid_RAS.csv file
     # from gh_url and save it to the current directory.
     gh_url = (
@@ -90,6 +107,11 @@ def wheres_waldo(rois, output, n_networks=7, n_parcels=100):
         f".Centroid_RAS.csv"
     )
     schaefer_info = pd.read_csv(csv_file, error_bad_lines=False)
+
+    # Load Schaefer atlas from nilearn
+    print("Loading Schaefer atlas...")
+    schaefer_atlas = fetch_atlas_schaefer_2018(n_rois=n_parcels, yeo_networks=n_networks)
+    atlas_img = nib.load(schaefer_atlas.maps)
 
     # Initialize empty directory to store the results
     dict_keys = ["values", "roi_label", "FS_coords", "MNI_152_coords", "location_detail"]
@@ -120,7 +142,7 @@ def wheres_waldo(rois, output, n_networks=7, n_parcels=100):
         output_dict["MNI_152_coords"].append(get_MNI_152(fs_coordinates))
 
         # Location detail
-        output_dict["location_detail"].append(location_details(roi))
+        output_dict["location_detail"].append(location_details(roi, atlas_img, method))
 
     # Save the results to a csv file
     print(f"Saving results to {output}...")
