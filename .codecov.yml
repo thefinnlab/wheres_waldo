@@ -15,7 +15,7 @@ coverage:
         threshold: 0
 
 ignore:
-  - 'template-package/tests/'
-  - 'template-package/due.py'
-  - 'template-package/_version.py'
-  - 'template-package/info.py'
+  - "wheres_waldo/tests/"
+  - "wheres_waldo/due.py"
+  - "wheres_waldo/_version.py"
+  - "wheres_waldo/info.py"

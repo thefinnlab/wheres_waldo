@@ -1,6 +1,6 @@
 .. _api_ref:
 
-.. currentmodule:: template-package
+.. currentmodule:: wheres_waldo
 
 ###
 API
@@ -10,21 +10,21 @@ API
 .. _api_module_ref:
 
 **************************************************
-:mod:`template-package.module`: Module description
+:mod:`wheres_waldo.module`: Module description
 **************************************************
 
-.. automodule:: template-package.module
+.. automodule:: wheres_waldo.module
    :no-members:
    :no-inherited-members:
 
-.. currentmodule:: template-package.module
+.. currentmodule:: wheres_waldo.module
 
 .. autosummary::
    :toctree: generated/
    :template: class.rst
 
-   template-package.module.Class
+   wheres_waldo.module.Class
 
    :template: function.rst
 
-   template-package.module.function
+   wheres_waldo.module.function
