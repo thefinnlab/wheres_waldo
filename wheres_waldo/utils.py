@@ -6,7 +6,6 @@ from nimare.dataset import Dataset
 from nimare.decode import discrete
 from nimare.extract import fetch_neurosynth
 from nimare.io import convert_neurosynth_to_dataset
-from nimare.utils import get_resource_path
 
 
 def get_MNI_152(freesurfer_coords):
@@ -37,7 +36,24 @@ def extract_roi_name(term):
     return term.split("__")[1]
 
 
-def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, decoder=None):
+def load_dset(out_dir, dset_fn):
+    # Download dataset from neurosynth if it doesn't exist.
+    if dset_fn is not None:
+        if os.path.exists(os.path.join(out_dir, dset_fn)):
+            print("Loading Neurosynth data...")
+            dset = Dataset.load(os.path.join(out_dir, dset_fn))
+        else:
+            print("Downloading Neurosynth data...")
+            dset = neurosynth_to_nimare(out_dir)
+            dset.save(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
+    elif os.path.exists(os.path.join(out_dir, "neurosynth_dataset.pkl.gz")):
+        print("Found Neurosynth data on output directory")
+        print("Loading Neurosynth data...")
+        dset = Dataset.load(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
+    return dset
+
+
+def location_details(roi, atlas_img, method="association", n_labels=1, dset=None, decoder=None):
     """Get details about a ROI.
 
     Parameters
@@ -52,6 +68,10 @@ def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, 
         Decoding method, by default "association"
     n_labels : int, optional
         Number of labels to retrieve (between 1 and 5), by default 1
+    dset : nimare.dataset.Dataset, optional
+        Neurosynth dataset, by default None
+    decoder : nimare.decode.Decoder, optional
+        Decoder, by default None
 
     Raises
     ------
@@ -73,15 +93,6 @@ def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, 
     roi_mask[roi_mask != roi] = 0
     roi_mask[roi_mask == roi] = 1
     roi_img = new_img_like(atlas_img, roi_mask)
-
-    # Get dataset from neurosynth if it doesn't exist.
-    if not os.path.exists(os.path.join(out_dir, "neurosynth_dataset.pkl.gz")):
-        print("Downloading Neurosynth data...")
-        dset = neurosynth_to_nimare(out_dir)
-        dset.save(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
-    else:
-        print("Loading Neurosynth data...")
-        dset = Dataset.load(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
 
     # Decode the ROI.
     if method == "brainmap" or method == "chi":

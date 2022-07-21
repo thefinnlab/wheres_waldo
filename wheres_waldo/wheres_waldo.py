@@ -7,7 +7,7 @@ import pandas as pd
 from nilearn.datasets import fetch_atlas_schaefer_2018
 
 from wheres_waldo import __version__
-from wheres_waldo.utils import get_MNI_152, location_details
+from wheres_waldo.utils import get_MNI_152, load_dset, location_details
 
 
 def _get_parser():
@@ -103,6 +103,15 @@ def _get_parser():
         dest="n_labels",
         choices=[1, 2, 3, 4, 5],
     )
+    optional.add_argument(
+        "-dset",
+        "--dataset",
+        help="Neurosynth dataset to use.",
+        required=False,
+        type=str,
+        dest="dset_fn",
+        default=None,
+    )
     optional.add_argument("-v", "--version", action="version", version=("%(prog)s " + __version__))
 
     parser._action_groups.append(optional)
@@ -119,6 +128,7 @@ def wheres_waldo(
     n_parcels=100,
     method="association",
     n_labels=1,
+    dset_fn=None,
 ):
     # Download the Schaefer2018_100Parcels_7Networks_order_FSLMNI152_1mm.Centroid_RAS.csv file
     # from gh_url and save it to the current directory.
@@ -151,6 +161,9 @@ def wheres_waldo(
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    # Load neurosynth dataset if it exists in the output directory,
+    # otherwise download it and save it to the output directory.
+    dset = load_dset(out_dir, dset_fn)
     decoder = None
 
     # If user wants to analyze all ROIs in the atlas,
@@ -183,7 +196,7 @@ def wheres_waldo(
         output_dict["MNI_152_coords"].append(get_MNI_152(fs_coordinates))
 
         # Location detail
-        loc_details, decoder = location_details(roi, atlas_img, out_dir, method, n_labels, decoder)
+        loc_details, decoder = location_details(roi, atlas_img, method, n_labels, dset, decoder)
         output_dict["location_detail"].append(loc_details)
 
     # Create dataframe from output_dict to save results
