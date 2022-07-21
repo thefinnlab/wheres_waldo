@@ -76,9 +76,11 @@ def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, 
 
     # Get dataset from neurosynth if it doesn't exist.
     if not os.path.exists(os.path.join(out_dir, "neurosynth_dataset.pkl.gz")):
+        print("Downloading Neurosynth data...")
         dset = neurosynth_to_nimare(out_dir)
         dset.save(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
     else:
+        print("Loading Neurosynth data...")
         dset = Dataset.load(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
 
     # Decode the ROI.
@@ -113,6 +115,7 @@ def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, 
         raise ValueError(f"Method {method} not supported.")
 
     # Get the top n_labels labels
+    print(f"Getting top labels for ROI {roi}...")
     roi_names = [extract_roi_name(x) for x in top_results.index[:n_labels]]
 
     # Return the name of the n_labels ROIs with the highest score
