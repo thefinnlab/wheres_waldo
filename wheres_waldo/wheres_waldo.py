@@ -83,6 +83,16 @@ def _get_parser():
         dest="method",
         choices=["association", "chi", "brainmap"],
     )
+    optional.add_argument(
+        "-l",
+        "--labels",
+        help="Number of labels to retrieve (between 1 and 5).",
+        required=False,
+        type=int,
+        default=1,
+        dest="n_labels",
+        choices=[1, 2, 3, 4, 5],
+    )
     optional.add_argument("-v", "--version", action="version", version=("%(prog)s " + __version__))
 
     parser._action_groups.append(optional)
@@ -90,7 +100,9 @@ def _get_parser():
     return parser
 
 
-def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method="association"):
+def wheres_waldo(
+    rois, output, out_dir=".", n_networks=7, n_parcels=100, method="association", n_labels=1
+):
     # Download the Schaefer2018_100Parcels_7Networks_order_FSLMNI152_1mm.Centroid_RAS.csv file
     # from gh_url and save it to the current directory.
     gh_url = (
@@ -122,9 +134,11 @@ def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method=
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
+    decoder = None
+
     # Loop through each ROI and get details
     for roi in rois:
-        print(f"Gettin details for {roi} ROI...")
+        print(f"Getting details for ROI {roi}...")
 
         # Name of the ROI
         output_dict["values"].append(
@@ -147,7 +161,8 @@ def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method=
         output_dict["MNI_152_coords"].append(get_MNI_152(fs_coordinates))
 
         # Location detail
-        output_dict["location_detail"].append(location_details(roi, atlas_img, out_dir, method))
+        loc_details, decoder = location_details(roi, atlas_img, out_dir, method, n_labels, decoder)
+        output_dict["location_detail"].append(loc_details)
 
     # Save the results to a csv file
     print(f"Saving results to {output}...")

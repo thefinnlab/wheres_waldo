@@ -21,8 +21,24 @@ def get_MNI_152(freesurfer_coords):
     return np.dot(v, M)
 
 
-def location_details(roi, atlas_img, method="association"):
-    """_summary_
+def extract_roi_name(term):
+    """Extract the ROI name from a Neurosynth term.
+
+    Parameters
+    ----------
+    term : str
+        Neurosynth term.
+
+    Returns
+    -------
+    roi_name : str
+        ROI name.
+    """
+    return term.split("__")[1]
+
+
+def location_details(roi, atlas_img, out_dir, method="association", n_labels=1, decoder=None):
+    """Get details about a ROI.
 
     Parameters
     ----------
@@ -30,8 +46,12 @@ def location_details(roi, atlas_img, method="association"):
         Index of the ROI in the atlas.
     atlas_img : nib.Nifti1Image
         Atlas image.
+    out_dir : str
+        Output directory.
     method : str, optional
         Decoding method, by default "association"
+    n_labels : int, optional
+        Number of labels to retrieve (between 1 and 5), by default 1
 
     Raises
     ------
@@ -40,13 +60,13 @@ def location_details(roi, atlas_img, method="association"):
 
     Returns
     -------
-    _type_
-        _description_
+    roi_names : list
+        List of ROI names.
 
     Notes
     -----
 
-    Based on the following link: https://bit.ly/3nH7hWF
+    Based on the following link in the NiMare docs: https://bit.ly/3nH7hWF
     """
     atlas = atlas_img.get_fdata()
     roi_mask = atlas.copy()
@@ -54,13 +74,29 @@ def location_details(roi, atlas_img, method="association"):
     roi_mask[roi_mask == roi] = 1
     roi_img = new_img_like(atlas_img, roi_mask)
 
-    # Load dataset with abstracts
-    dset = Dataset(os.path.join(get_resource_path(), "neurosynth_laird_studies.json"))
-    dset.annotations.head(5)
+    # Get dataset from neurosynth if it doesn't exist.
+    if not os.path.exists(os.path.join(out_dir, "neurosynth_dataset.pkl.gz")):
+        dset = neurosynth_to_nimare(out_dir)
+        dset.save(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
+    else:
+        dset = Dataset.load(os.path.join(out_dir, "neurosynth_dataset.pkl.gz"))
 
+    # Decode the ROI.
     if method == "brainmap" or method == "chi":
         # Get studies with voxels in the mask
         ids = dset.get_studies_by_mask(roi_img)
+
+        # Initialize decoder
+        if decoder is None and method == " brainmap":
+            decoder = discrete.BrainMapDecoder(correction=None)
+        elif decoder is None and method == "chi":
+            decoder = discrete.NeurosynthDecoder(correction=None)
+        elif decoder is None:
+            raise ValueError("Method not supported.")
+
+        decoder.fit(dset)
+        decoded_df = decoder.transform(ids=ids)
+        top_results = decoded_df.sort_values(by="probReverse", ascending=False).head()
 
     elif method == "association":
         # Neurosynth ROI association method
@@ -71,9 +107,16 @@ def location_details(roi, atlas_img, method="association"):
         # The `transform` method doesn't take any parameters.
         decoded_df = decoder.transform()
 
-        decoded_df.sort_values(by="r", ascending=False).head()
+        # Sort by `r` of association
+        top_results = decoded_df.sort_values(by="r", ascending=False).head()
     else:
         raise ValueError(f"Method {method} not supported.")
+
+    # Get the top n_labels labels
+    roi_names = [extract_roi_name(x) for x in top_results.index[:n_labels]]
+
+    # Return the name of the n_labels ROIs with the highest score
+    return roi_names, decoder
 
 
 def neurosynth_to_nimare(out_dir, source="abstract", vocab="terms"):
@@ -93,7 +136,6 @@ def neurosynth_to_nimare(out_dir, source="abstract", vocab="terms"):
     neurosynth_dataset : nimare.dataset.Dataset
         Neurosynth dataset.
     """
-    out_dir = os.path.abspath("../example_data/")
     os.makedirs(out_dir, exist_ok=True)
 
     files = fetch_neurosynth(
