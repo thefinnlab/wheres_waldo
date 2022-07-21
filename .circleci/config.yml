@@ -5,99 +5,12 @@
 version: 2.1
 orbs:
   codecov: codecov/codecov@1.0.5
+
 jobs:
-  py36_unittest:
-    working_directory: /tmp/src/wheres_waldo
-    docker:
-      - image: continuumio/miniconda3
-    steps:
-      - checkout
-      - persist_to_workspace:
-          root: /tmp
-          paths:
-            - src/wheres_waldo
-      - run: # will overwrite wheres_waldo installation each time
-          name: Generate environment
-          command: |
-            if [[ -e /opt/conda/envs/py36_env ]]; then
-                echo "Restoring environment from cache"
-                source activate py36_env
-            else
-                conda create -n py36_env python=3.6 numpy -yq
-                source activate py36_env
-                pip install -e .[tests]
-            fi
-            python setup.py install --user
-      - run:
-          name: Run tests
-          command: |
-            apt-get update
-            apt-get install -yqq make
-            source activate py36_env
-            make unittest
-
-  py37_unittest:
-    working_directory: /tmp/src/wheres_waldo
-    docker:
-      - image: continuumio/miniconda3
-    steps:
-      - checkout
-      - persist_to_workspace:
-          root: /tmp
-          paths:
-            - src/wheres_waldo
-      - run: # will overwrite wheres_waldo installation each time
-          name: Generate environment
-          command: |
-            if [[ -e /opt/conda/envs/py37_env ]]; then
-                echo "Restoring environment from cache"
-                source activate py37_env
-            else
-                conda create -n py37_env python=3.7 numpy -yq
-                source activate py37_env
-                pip install -e .[tests]
-            fi
-            python setup.py install --user
-      - run:
-          name: Run tests
-          command: |
-            apt-get update
-            apt-get install -yqq make
-            source activate py37_env
-            make unittest
-
-  py38_unittest:
-    working_directory: /tmp/src/wheres_waldo
-    docker:
-      - image: continuumio/miniconda3
-    steps:
-      - checkout
-      - persist_to_workspace:
-          root: /tmp
-          paths:
-            - src/wheres_waldo
-      - run: # will overwrite wheres_waldo installation each time
-          name: Generate environment
-          command: |
-            if [[ -e /opt/conda/envs/py38_env ]]; then
-                echo "Restoring environment from cache"
-                source activate py38_env
-            else
-                conda create -n py38_env python=3.8 numpy -yq
-                source activate py38_env
-                pip install pip -U
-                pip install -e .[tests]
-            fi
-            python setup.py install --user
-      - run:
-          name: Run tests
-          command: |
-            apt-get update
-            apt-get install -yqq make
-            source activate py38_env
-            make unittest
-
-  py39_env:
+  py_env:
+    parameters:
+      PYTHON:
+        type: string
     working_directory: /tmp/src/wheres_waldo
     docker:
       - image: continuumio/miniconda3
@@ -108,25 +21,28 @@ jobs:
           paths:
             - src/wheres_waldo
       - restore_cache: # ensure this step occurs *before* installing dependencies
-          key: deps1-{{ checksum "wheres_waldo/setup.cfg" }}-{{ checksum "setup.py" }}
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "<< parameters.PYTHON >>" }}
       - run: # will overwrite wheres_waldo installation each time
           name: Generate environment
           command: |
-            if [[ -e /opt/conda/envs/py39_env ]]; then
+            if [[ -e /opt/conda/envs/py<< parameters.PYTHON >>_env ]]; then
                 echo "Restoring environment from cache"
-                source activate py39_env
+                source activate py<< parameters.PYTHON >>_env
             else
-                conda create -n py39_env python=3.9 numpy -yq
-                source activate py39_env
+                conda create -n py<< parameters.PYTHON >>_env python=<< parameters.PYTHON >> numpy=1.21 -yq
+                source activate py<< parameters.PYTHON >>_env
                 pip install -e .[tests,doc]
             fi
             python setup.py install --user
       - save_cache: # environment cache tied to requirements
-          key: deps1-{{ checksum "wheres_waldo/setup.cfg" }}-{{ checksum "setup.py" }}
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "<< parameters.PYTHON >>" }}
           paths:
-            - "/opt/conda/envs/py39_env"
+            - "/opt/conda/envs/py<< parameters.PYTHON >>_env"
 
-  py39_unittest_and_coverage:
+  py_unittest:
+    parameters:
+      PYTHON:
+        type: string
     working_directory: /tmp/src/wheres_waldo
     docker:
       - image: continuumio/miniconda3
@@ -134,15 +50,42 @@ jobs:
       - attach_workspace: # get wheres_waldo
           at: /tmp
       - restore_cache: # load environment
-          key: deps1-{{ checksum "wheres_waldo/setup.cfg" }}-{{ checksum "setup.py" }}
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "<< parameters.PYTHON >>" }}
       - run:
           name: Run tests and compile coverage
           command: |
             apt-get update
             apt-get install -yqq make
             apt-get install -yqq curl
-            source activate py39_env
+            cp -r /opt/conda/envs/py<< parameters.PYTHON >>_env /opt/miniconda-latest/envs/py<< parameters.PYTHON >>_env
+            source activate py<< parameters.PYTHON >>_env
             make unittest
+      - codecov/upload:
+          file: /tmp/src/wheres_waldo/coverage.xml
+
+  py_integration:
+    parameters:
+      PYTHON:
+        type: string
+    working_directory: /tmp/src/wheres_waldo
+    docker:
+      - image: continuumio/miniconda3
+    resource_class: large
+    steps:
+      - attach_workspace: # get wheres_waldo
+          at: /tmp
+      - restore_cache: # load environment
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "<< parameters.PYTHON >>" }}
+      - run:
+          name: Run tests and compile coverage
+          command: |
+            apt-get update
+            apt-get install -yqq make
+            apt-get install -yqq curl
+            cp -r /opt/conda/envs/py<< parameters.PYTHON >>_env /opt/miniconda-latest/envs/py<< parameters.PYTHON >>_env
+            source activate py<< parameters.PYTHON >>_env
+            make integrationtest
+          no_output_timeout: 30m
       - codecov/upload:
           file: /tmp/src/wheres_waldo/coverage.xml
 
@@ -154,11 +97,11 @@ jobs:
       - attach_workspace: # get wheres_waldo
           at: /tmp
       - restore_cache: # load environment
-          key: deps1-{{ checksum "wheres_waldo/setup.cfg" }}-{{ checksum "setup.py" }}
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "3.9" }}
       - run:
           name: Build documentation
           command: |
-            source activate py39_env
+            source activate py3.9_env
             apt-get update
             apt-get install -yqq make pandoc
             make -C docs html
@@ -174,11 +117,11 @@ jobs:
       - attach_workspace: # get wheres_waldo
           at: /tmp
       - restore_cache: # load environment
-          key: deps1-{{ checksum "wheres_waldo/setup.cfg" }}-{{ checksum "setup.py" }}
+          key: deps1-{{ checksum "setup.cfg" }}-{{ checksum "setup.py" }}-{{ "3.9" }}
       - run:
           name: Linting
           command: |
-            source activate py39_env
+            source activate py3.9_env
             flake8 /tmp/src/wheres_waldo/wheres_waldo
       - store_artifacts:
           path: /tmp/data/lint
@@ -187,16 +130,28 @@ workflows:
   version: 2.1
   run_tests:
     jobs:
-      - py36_unittest
-      - py37_unittest
-      - py38_unittest
-      - py39_env
-      - py39_unittest_and_coverage:
-          requires:
-            - py39_env
-      - build_docs:
-          requires:
-            - py39_env
+      - py_env:
+          name: py_env-<< matrix.PYTHON >>
+          matrix:
+            parameters:
+              PYTHON: ["3.10", "3.9", "3.8"]
       - style_check:
           requires:
-            - py39_env
+            - py_env-3.9
+      - py_unittest:
+          name: py_unittest-<< matrix.PYTHON >>
+          matrix:
+            parameters:
+              PYTHON: ["3.10", "3.9", "3.8"]
+          requires:
+            - py_env-<< matrix.PYTHON >>
+      - py_integration:
+          name: py_integration-<< matrix.PYTHON >>
+          matrix:
+            parameters:
+              PYTHON: ["3.10", "3.9", "3.8"]
+          requires:
+            - py_env-<< matrix.PYTHON >>
+      - build_docs:
+          requires:
+            - py_env-3.9
