@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import nibabel as nib
@@ -117,6 +118,10 @@ def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method=
     dict_keys = ["values", "roi_label", "FS_coords", "MNI_152_coords", "location_detail"]
     output_dict = {key: [] for key in dict_keys}
 
+    # Create output directory if it doesn't exist
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir)
+
     # Loop through each ROI and get details
     for roi in rois:
         print(f"Gettin details for {roi} ROI...")
@@ -142,7 +147,7 @@ def wheres_waldo(rois, output, out_dir=".", n_networks=7, n_parcels=100, method=
         output_dict["MNI_152_coords"].append(get_MNI_152(fs_coordinates))
 
         # Location detail
-        output_dict["location_detail"].append(location_details(roi, atlas_img, method))
+        output_dict["location_detail"].append(location_details(roi, atlas_img, out_dir, method))
 
     # Save the results to a csv file
     print(f"Saving results to {output}...")
